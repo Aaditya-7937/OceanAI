@@ -1,2 +1,4 @@
 venv
 *.pdf
+learning.txt
+node_modules
