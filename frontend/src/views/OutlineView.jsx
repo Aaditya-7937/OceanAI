@@ -1,22 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+    doc,
+    onSnapshot,
+    updateDoc,
+    arrayUnion,
+} from 'firebase/firestore';
+import { ChevronLeft, Loader2, AlertTriangle, Menu, ChevronUp, ChevronDown, Trash2, Plus, Zap } from 'lucide-react';
+import { db, appId } from '../firebase';
+
 // OutlineView Component (src/views/OutlineView.jsx)
-const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectId, setSelectedProjectId }) => {
-    const [project, setProject] = useState(null);
-    const [loadingProject, setLoadingProject] = useState(true);
+const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectId, setSelectedProjectId, draftProject, setDraftProject }) => {
+    const [project, setProject] = useState(draftProject || null);
+    const [loadingProject, setLoadingProject] = useState(Boolean(selectedProjectId)); // only true if we'll fetch
     const [newTitle, setNewTitle] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
 
-    // Fetch project data and set up real-time listener
+    // If a selectedProjectId exists, fetch from Firestore (existing behavior)
     useEffect(() => {
-        if (!db || !selectedProjectId) {
-            setView('dashboard'); // Redirect if no project is selected
+        if (!db) {
+            setError('Database not available');
+            setLoadingProject(false);
+            return;
+        }
+
+        if (!selectedProjectId) {
+            // no persisted project: load draftProject if available
+            setProject(draftProject || { outline: [], docType: draftProject?.docType || 'docx', mainTopic: draftProject?.mainTopic || '' });
+            setLoadingProject(false);
             return;
         }
 
         setLoadingProject(true);
         const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
-
         const unsubscribe = onSnapshot(projectRef, (docSnapshot) => {
             if (docSnapshot.exists()) {
                 setProject({ id: docSnapshot.id, ...docSnapshot.data() });
@@ -34,79 +50,100 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
         });
 
         return () => unsubscribe();
-    }, [userId, selectedProjectId, setView]);
+    }, [userId, selectedProjectId]); // eslint-disable-line
+
+    // Persist outline changes to draftProject if not saved to Firestore
+    useEffect(() => {
+        if (!selectedProjectId && setDraftProject) {
+            setDraftProject({
+                ...(draftProject || {}),
+                docType: project?.docType,
+                mainTopic: project?.mainTopic,
+                outline: project?.outline || []
+            });
+        }
+    }, [project?.outline]); // eslint-disable-line
 
     const handleAddTitle = async () => {
-        if (!newTitle.trim() || !project) return;
+        if (!newTitle.trim()) return;
 
-        setIsSaving(true);
-        try {
-            const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
-
-            // Add a new outline item. Structure: { title: string, content: string (empty initially) }
-            const newOutlineItem = {
-                id: Date.now(), // Simple unique ID for list
-                title: newTitle.trim(),
-                content: ""
-            };
-
-            await updateDoc(projectRef, {
-                outline: arrayUnion(newOutlineItem)
-            });
-
-            setNewTitle('');
-            setError(null);
-        } catch (err) {
-            console.error("Error adding title:", err);
-            setError("Could not add title. Please try again.");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    // Function to reorder the outline (move item up or down)
-    const handleReorder = async (index, direction) => {
-        if (!project || isSaving) return;
-
-        const outline = [...project.outline];
-        const newIndex = index + direction;
-
-        if (newIndex >= 0 && newIndex < outline.length) {
-            const itemToMove = outline.splice(index, 1)[0];
-            outline.splice(newIndex, 0, itemToMove);
-
+        // If project is persisted in Firestore
+        if (selectedProjectId) {
             setIsSaving(true);
             try {
                 const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
-                await updateDoc(projectRef, { outline: outline });
+                const newOutlineItem = { id: Date.now(), title: newTitle.trim(), content: "" };
+                await updateDoc(projectRef, { outline: arrayUnion(newOutlineItem) });
+                setNewTitle('');
+                setError(null);
+            } catch (err) {
+                console.error("Error adding title:", err);
+                setError("Could not add title. Please try again.");
+            } finally {
+                setIsSaving(false);
+            }
+            return;
+        }
+
+        // Otherwise mutate local project draft
+        const newOutlineItem = { id: Date.now(), title: newTitle.trim(), content: "" };
+        setProject(prev => ({ ...(prev || {}), outline: [...(prev?.outline || []), newOutlineItem] }));
+        setNewTitle('');
+    };
+
+    // Reorder/delete logic: if persisted, perform updateDoc; else update local project object
+    const updateLocalOutline = (outline) => {
+        setProject(prev => ({ ...(prev || {}), outline }));
+    };
+
+    const handleReorder = async (index, direction) => {
+        if (!project || isSaving) return;
+        const outline = [...(project.outline || [])];
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= outline.length) return;
+        const item = outline.splice(index, 1)[0];
+        outline.splice(newIndex, 0, item);
+
+        if (selectedProjectId) {
+            setIsSaving(true);
+            try {
+                const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
+                await updateDoc(projectRef, { outline });
             } catch (err) {
                 console.error("Error reordering outline:", err);
                 setError("Could not reorder outline.");
             } finally {
                 setIsSaving(false);
             }
+        } else {
+            updateLocalOutline(outline);
         }
     };
 
-    // Function to delete an outline item
     const handleDeleteTitle = async (id) => {
         if (!project || isSaving) return;
+        const updatedOutline = (project.outline || []).filter(item => item.id !== id);
 
-        const updatedOutline = project.outline.filter(item => item.id !== id);
-
-        setIsSaving(true);
-        try {
-            const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
-            await updateDoc(projectRef, { outline: updatedOutline });
-        } catch (err) {
-            console.error("Error deleting title:", err);
-            setError("Could not delete title. Please try again.");
-        } finally {
-            setIsSaving(false);
+        if (selectedProjectId) {
+            setIsSaving(true);
+            try {
+                const projectRef = doc(db, `artifacts/${appId}/users/${userId}/projects`, selectedProjectId);
+                await updateDoc(projectRef, { outline: updatedOutline });
+            } catch (err) {
+                console.error("Error deleting title:", err);
+                setError("Could not delete title. Please try again.");
+            } finally {
+                setIsSaving(false);
+            }
+        } else {
+            updateLocalOutline(updatedOutline);
         }
     };
 
     const docName = project?.docType === 'docx' ? 'Section Header' : 'Slide Title';
+
+    // show toggle only when there is draftProject data
+    const draftHasData = Boolean((draftProject && ((draftProject.docType && draftProject.docType !== '') || (draftProject.mainTopic && draftProject.mainTopic.trim().length > 0) || (draftProject.outline && draftProject.outline.length > 0))));
 
     if (loadingProject) {
         return (
@@ -135,12 +172,26 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
     return (
         <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-2xl">
             <div className="flex justify-between items-center mb-6 border-b pb-3">
-                <button
-                    onClick={() => { setView('dashboard'); setSelectedProjectId(null); }}
-                    className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition duration-150 active:scale-[.98]"
-                >
-                    <ChevronLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-                </button>
+                <div className="flex items-center">
+                    {/* Back to Dashboard */}
+                    <button
+                        onClick={() => { setView('dashboard'); setSelectedProjectId(null); }}
+                        className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition duration-150 active:scale-[.98]"
+                    >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Back to Dashboard
+                    </button>
+
+                    {/* If draft data exists and this project is NOT persisted, show Edit Config toggle */}
+                    {!selectedProjectId && draftHasData && (
+                        <button
+                            onClick={() => setView('configure')}
+                            className="ml-4 text-sm text-indigo-600 hover:text-indigo-800 transition px-3 py-1 rounded-md border border-indigo-100"
+                        >
+                            Edit Configuration
+                        </button>
+                    )}
+                </div>
+
                 <button
                     onClick={onSignOut}
                     className="py-1 px-3 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition duration-150"
@@ -150,22 +201,15 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
             </div>
 
             <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Define Outline</h1>
-            <p className="text-gray-500 mb-2">Step 2: Structure your document ({project.docType.toUpperCase()}).</p>
+            <p className="text-gray-500 mb-2">Step 2: Structure your document ({(project?.docType || 'docx').toUpperCase()}).</p>
             <div className="p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded-lg mb-6">
-                <p className="font-semibold text-indigo-800 line-clamp-1">Topic: {project.mainTopic}</p>
+                <p className="font-semibold text-indigo-800 line-clamp-1">Topic: {project?.mainTopic}</p>
             </div>
-
-            {error && (
-                <div className="flex items-start p-3 mb-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
-                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                    <span className="ml-3 text-sm">{error}</span>
-                </div>
-            )}
 
             {/* Current Outline List */}
             <div className="space-y-3 mb-8">
-                <h3 className="text-xl font-bold text-gray-700">{docName} List ({project.outline.length})</h3>
-                {project.outline.length === 0 ? (
+                <h3 className="text-xl font-bold text-gray-700">{docName} List ({project?.outline?.length || 0})</h3>
+                {(!project?.outline || project.outline.length === 0) ? (
                     <div className="p-6 text-center border-2 border-dashed border-gray-200 rounded-xl text-gray-500">
                         <Menu className="w-6 h-6 mx-auto mb-2" />
                         No {docName.toLowerCase()}s added yet. Start by adding the Introduction.
@@ -183,7 +227,6 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
                                 </div>
 
                                 <div className="flex space-x-1.5 ml-4">
-                                    {/* Up Button */}
                                     <button
                                         onClick={() => handleReorder(index, -1)}
                                         disabled={index === 0 || isSaving}
@@ -193,7 +236,6 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
                                         <ChevronUp className="w-4 h-4" />
                                     </button>
 
-                                    {/* Down Button */}
                                     <button
                                         onClick={() => handleReorder(index, 1)}
                                         disabled={index === project.outline.length - 1 || isSaving}
@@ -203,7 +245,6 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
                                         <ChevronDown className="w-4 h-4" />
                                     </button>
 
-                                    {/* Delete Button */}
                                     <button
                                         onClick={() => handleDeleteTitle(item.id)}
                                         disabled={isSaving}
@@ -241,9 +282,8 @@ const OutlineView = ({ setView, userId, displayName, onSignOut, selectedProjectI
 
             {/* Final Action Button (Proceed to Generation) */}
             <button
-                // This is where the AI Generation step will be initiated in the next stage
                 onClick={() => console.log('Proceed to AI Generation for project:', selectedProjectId)}
-                disabled={isSaving || project.outline.length === 0}
+                disabled={isSaving || !(project?.outline && project.outline.length > 0)}
                 className="w-full py-3 flex items-center justify-center space-x-2 bg-green-600 text-white font-bold text-lg rounded-xl shadow-xl hover:bg-green-700 transition duration-150 active:scale-[.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {isSaving ? (

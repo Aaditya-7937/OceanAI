@@ -49,6 +49,10 @@ const App = () => {
     const [authBoxPosition, setAuthBoxPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
     const [selectedProjectId, setSelectedProjectId] = useState(null); // Tracks the project currently being configured/edited
 
+    // New: draftProject kept in memory while user toggles between configure & outline
+    // Structure example: { docType: 'docx'|'pptx', mainTopic: string, outline: [...] }
+    const [draftProject, setDraftProject] = useState(null);
+
     // 1. Firebase Initialization and Auth Logic
     useEffect(() => {
         // initialAuth uses the shared auth instance (from src/firebase.js)
@@ -126,6 +130,7 @@ const App = () => {
             await signOut(auth);
             setUser(null);
             setSelectedProjectId(null);
+            setDraftProject(null); // clear any in-memory draft when signing out
             setView('login');
         } catch (error) {
             console.error("Sign Out Error:", error);
@@ -153,6 +158,8 @@ const App = () => {
                         displayName={userDisplayName}
                         onSignOut={handleSignOut}
                         setSelectedProjectId={setSelectedProjectId}
+                        draftProject={draftProject}
+                        setDraftProject={setDraftProject}
                     />
                 );
                 containerClass = "w-full max-w-4xl"; // Wider container
@@ -166,6 +173,8 @@ const App = () => {
                         onSignOut={handleSignOut}
                         selectedProjectId={selectedProjectId}
                         setSelectedProjectId={setSelectedProjectId}
+                        draftProject={draftProject}
+                        setDraftProject={setDraftProject}
                     />
                 );
                 containerClass = "w-full max-w-4xl"; // Wider container
@@ -179,6 +188,7 @@ const App = () => {
                         displayName={userDisplayName}
                         onSignOut={handleSignOut}
                         setSelectedProjectId={setSelectedProjectId}
+                    // not passing draftProject to dashboard by default
                     />
                 );
                 containerClass = "w-full max-w-7xl min-h-[90vh]"; // Even wider container for dashboard
@@ -234,3 +244,4 @@ const App = () => {
     );
 };
 export default App;
+

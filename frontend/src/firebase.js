@@ -24,7 +24,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
+const appId = LOCAL_FIREBASE_CONFIG.projectId;
 // Keep same log level behavior you had
 _setLogLevel && _setLogLevel('debug');
-
-export { firebaseApp, auth, db };
+export { firebaseApp, auth, db, appId };

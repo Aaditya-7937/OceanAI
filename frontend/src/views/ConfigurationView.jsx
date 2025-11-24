@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ChevronLeft, FileText, Presentation, Loader2, Settings } from 'lucide-react';
+import { db, appId } from '../firebase';
 
-// The rest of your component logic follows...
 // ConfigurationView Component (src/views/ConfigurationView.jsx)
-const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelectedProjectId }) => {
-    const [docType, setDocType] = useState(''); // 'docx' or 'pptx'
-    const [mainTopic, setMainTopic] = useState('');
+const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelectedProjectId, draftProject, setDraftProject }) => {
+    const [docType, setDocType] = useState(draftProject?.docType || ''); // 'docx' or 'pptx'
+    const [mainTopic, setMainTopic] = useState(draftProject?.mainTopic || '');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Function to handle project creation and routing
+    // keep draftProject in sync with local inputs
+    useEffect(() => {
+        if (setDraftProject) {
+            setDraftProject({
+                ...(draftProject || {}),
+                docType: docType || '',
+                mainTopic: mainTopic || '',
+                outline: draftProject?.outline || []
+            });
+        }
+    }, [docType, mainTopic]); // eslint-disable-line
+
+    // Function to handle project creation and routing (unchanged)
     const handleCreateProject = async () => {
+        console.log('CREATE CLICK', { docType, mainTopic, userId, draftProject, db, appId });
+
         if (!docType || !mainTopic.trim()) {
             console.error("Please select a document type and enter a topic.");
             return;
@@ -24,15 +38,16 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
                 displayName: displayName || 'Anon User',
                 docType: docType,
                 mainTopic: mainTopic.trim(),
-                outline: [], // Initialize with an empty outline
-                status: 'configured', // 'configured', 'generated', 'refined'
+                outline: draftProject?.outline || [], // persist any outline drafted
+                status: 'configured',
                 createdAt: serverTimestamp(),
             });
 
             // Set the new project ID and move to the outline step
             setSelectedProjectId(newProjectRef.id);
             setView('outline');
-
+            // clear draft after persisting (optional)
+            setDraftProject(null);
         } catch (error) {
             console.error("Error creating new project:", error);
             // Show error message on UI
@@ -41,15 +56,30 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
         }
     };
 
+    // show toggle only when draft contains something
+    const draftHasData = Boolean((docType && docType !== '') || (mainTopic && mainTopic.trim().length > 0) || (draftProject && (draftProject.outline && draftProject.outline.length > 0)));
+
     return (
         <div className="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-                <button
-                    onClick={() => setView('dashboard')}
-                    className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition duration-150 active:scale-[.98]"
-                >
-                    <ChevronLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-                </button>
+                <div className="flex items-center space-x-3">
+                    <button
+                        onClick={() => setView('dashboard')}
+                        className="flex items-center text-sm text-gray-600 hover:text-indigo-600 transition duration-150 active:scale-[.98]"
+                    >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Back to Dashboard
+                    </button>
+                    {/* If there's draft data and no selected project, show a small "Go to Outline" button */}
+                    {draftHasData && (
+                        <button
+                            onClick={() => setView('outline')}
+                            className="text-sm text-indigo-600 hover:text-indigo-800 ml-3 px-3 py-1 rounded-md border border-indigo-100"
+                        >
+                            Go to Outline
+                        </button>
+                    )}
+                </div>
+
                 <button
                     onClick={onSignOut}
                     className="py-1 px-3 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition duration-150"
