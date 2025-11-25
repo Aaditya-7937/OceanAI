@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, query, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { Zap, Plus, FileText, Presentation, Edit, Trash2, Loader2, X, AlertTriangle } from 'lucide-react';
+import { db, appId } from '../firebase';
 
-
-const db = typeof window.db !== 'undefined' ? window.db : null;
-const appId = typeof window.__app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // Confirmation Modal Component
 const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel }) => {

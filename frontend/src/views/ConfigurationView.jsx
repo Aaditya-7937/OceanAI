@@ -1,9 +1,9 @@
+// src/views/ConfigurationView.jsx
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ChevronLeft, FileText, Presentation, Loader2, Settings } from 'lucide-react';
-import { db, appId } from '../firebase';
+// don't import Firestore here anymore for create; we persist later from OutlineView
+// keep db/appId import only if you still want to persist here (we do not need it now)
 
-// ConfigurationView Component (src/views/ConfigurationView.jsx)
 const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelectedProjectId, draftProject, setDraftProject }) => {
     const [docType, setDocType] = useState(draftProject?.docType || ''); // 'docx' or 'pptx'
     const [mainTopic, setMainTopic] = useState(draftProject?.mainTopic || '');
@@ -21,10 +21,8 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
         }
     }, [docType, mainTopic]); // eslint-disable-line
 
-    // Function to handle project creation and routing (unchanged)
+    // NEW: don't persist here. Save draft and navigate to Outline.
     const handleCreateProject = async () => {
-        console.log('CREATE CLICK', { docType, mainTopic, userId, draftProject, db, appId });
-
         if (!docType || !mainTopic.trim()) {
             console.error("Please select a document type and enter a topic.");
             return;
@@ -32,25 +30,21 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
 
         setIsSaving(true);
         try {
-            const projectsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/projects`);
-            const newProjectRef = await addDoc(projectsCollectionRef, {
-                userId: userId,
-                displayName: displayName || 'Anon User',
-                docType: docType,
-                mainTopic: mainTopic.trim(),
-                outline: draftProject?.outline || [], // persist any outline drafted
-                status: 'configured',
-                createdAt: serverTimestamp(),
-            });
+            // Persist draft in memory (so OutlineView sees it)
+            if (setDraftProject) {
+                setDraftProject({
+                    ...(draftProject || {}),
+                    docType,
+                    mainTopic: mainTopic.trim(),
+                    outline: draftProject?.outline || []
+                });
+            }
 
-            // Set the new project ID and move to the outline step
-            setSelectedProjectId(newProjectRef.id);
+            // route to outline (no Firestore call here)
+            setSelectedProjectId(null); // explicitly indicate we are working on a draft
             setView('outline');
-            // clear draft after persisting (optional)
-            setDraftProject(null);
-        } catch (error) {
-            console.error("Error creating new project:", error);
-            // Show error message on UI
+        } catch (err) {
+            console.error('Failed to save draft', err);
         } finally {
             setIsSaving(false);
         }
@@ -72,7 +66,7 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
                     {/* If there's draft data and no selected project, show a small "Go to Outline" button */}
                     {draftHasData && (
                         <button
-                            onClick={() => setView('outline')}
+                            onClick={() => { setSelectedProjectId(null); setView('outline'); }}
                             className="text-sm text-indigo-600 hover:text-indigo-800 ml-3 px-3 py-1 rounded-md border border-indigo-100"
                         >
                             Go to Outline
@@ -140,7 +134,7 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
                 <p className="text-sm text-gray-500 mt-2">Be detailed. This prompt defines the core content for the AI.</p>
             </div>
 
-            {/* Action Button */}
+            {/* Action Button now sets draft and routes to outline */}
             <button
                 onClick={handleCreateProject}
                 disabled={isSaving || !docType || !mainTopic.trim()}
@@ -149,7 +143,7 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
                 {isSaving ? (
                     <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Creating Project...</span>
+                        <span>Saving draft...</span>
                     </>
                 ) : (
                     <>
@@ -168,3 +162,4 @@ const ConfigurationView = ({ setView, userId, displayName, onSignOut, setSelecte
     );
 };
 export default ConfigurationView;
+

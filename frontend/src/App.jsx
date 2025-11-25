@@ -1,42 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-// import firebase singletons
-import { firebaseApp, auth, db } from './firebase';
+import React, { useState, useEffect, useRef } from 'react';
+
+// firebase singletons (appId is exported from your firebase.js)
+import { firebaseApp, auth, db, appId } from './firebase';
+
+// Firebase Auth
 import {
     signInWithCustomToken,
     onAuthStateChanged,
     signOut
 } from 'firebase/auth';
-import {
-    doc,
-    collection,
-    query,
-    onSnapshot,
-    addDoc,
-    serverTimestamp,
-    updateDoc,
-    deleteDoc,
-    getDoc,
-    arrayUnion,
-    arrayRemove
-} from 'firebase/firestore';
-import {
-    Zap, User, Lock, Mail, ChevronLeft, LogIn, UserPlus, AlertTriangle, MessageSquare, Plus, FileText, Presentation, Settings, Trash2, Edit, Loader2, Menu, ChevronUp, ChevronDown, Save
-} from 'lucide-react';
+
+// Views
 import DashboardView from './views/DashboardView.jsx';
 import ConfigurationView from './views/ConfigurationView.jsx';
 import OutlineView from './views/OutlineView.jsx';
-
-// --- COMPONENT IMPORTS (From src/components/Auth & src/components/Shared) ---
+import InteractiveView from './views/InteractiveView.jsx';
+// Auth / Shared Components
 import LoginView from './components/Auth/LoginView.jsx';
 import RegisterView from './components/Auth/RegisterView.jsx';
-import SpaceBackground from './components/Shared/SpaceBackground.jsx';
 import SpaceBackgroundStyles from './components/Shared/SpaceBackgroundStyles.jsx';
 import AnimatedLoader from './components/Shared/AnimatedLoader.jsx';
 import RobotPeeker from './components/Shared/RobotPeeker.jsx';
 
+
 // Local config fallbacks (kept for compatibility)
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
 
 // Main App Component (App.jsx)
 const App = () => {
@@ -193,6 +182,22 @@ const App = () => {
                 );
                 containerClass = "w-full max-w-7xl min-h-[90vh]"; // Even wider container for dashboard
                 break;
+            case 'interactive':
+                CurrentContent = (
+                    <InteractiveView
+                        setView={setView}
+                        userId={user.uid}
+                        displayName={userDisplayName}
+                        onSignOut={handleSignOut}
+                        selectedProjectId={selectedProjectId}
+                        setSelectedProjectId={setSelectedProjectId}
+                        draftProject={draftProject}
+                        setDraftProject={setDraftProject}
+                    />
+                );
+                containerClass = "w-full max-w-7xl"; // editor needs more room
+                break;
+
         }
     } else {
         // Unauthenticated routes
