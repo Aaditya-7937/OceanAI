@@ -400,6 +400,7 @@ async def regenerate(reg_req: RegenerateRequest = None, request: Request = None)
     prompt = (
         "You are given a JSON object representing a slide/section. Return a single JSON object ONLY that preserves the same top-level keys "
         "and the same `id`, but updates the values according to the user's feedback. Do not wrap the JSON in text.\n\n"
+        "Make sure you do exactly as the user says and keep in mind the original content. Always create new content in context to the original content unless otherwise stated by the user"
         f"Original: {original_item}\n\n"
         f"User feedback: {feedback}\n\n"
         "Apply changes necessary to satisfy the feedback. Keep bullets concise."

@@ -5,13 +5,13 @@ import { getFirestore, setLogLevel as _setLogLevel } from 'firebase/firestore';
 
 // Optional: copy your LOCAL_FIREBASE_CONFIG from App.jsx (or inject via env)
 const LOCAL_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCoB39FMopAYi6rsEl__8Yc0Bwu9_KlcLc",
-    authDomain: "ocean-44277.firebaseapp.com",
-    projectId: "ocean-44277",
-    storageBucket: "ocean-44277.firebasestorage.app",
-    messagingSenderId: "188628002836",
-    appId: "1:188628002836:web:a68c99e19b949f770edf01",
-    measurementId: "G-69FYFGLW8E"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const firebaseConfig = typeof __firebase_config !== 'undefined'
@@ -28,3 +28,4 @@ const appId = LOCAL_FIREBASE_CONFIG.projectId;
 // Keep same log level behavior you had
 _setLogLevel && _setLogLevel('debug');
 export { firebaseApp, auth, db, appId };
+export default LOCAL_FIREBASE_CONFIG;
