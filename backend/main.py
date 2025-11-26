@@ -402,7 +402,7 @@ async def regenerate(reg_req: RegenerateRequest = None, request: Request = None)
         "and the same `id`, but updates the values according to the user's feedback. Do not wrap the JSON in text.\n\n"
         f"Original: {original_item}\n\n"
         f"User feedback: {feedback}\n\n"
-        "Apply minimal changes necessary to satisfy the feedback. Keep bullets concise."
+        "Apply changes necessary to satisfy the feedback. Keep bullets concise."
     )
 
     try:

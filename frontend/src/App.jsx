@@ -14,7 +14,9 @@ import {
 import DashboardView from './views/DashboardView.jsx';
 import ConfigurationView from './views/ConfigurationView.jsx';
 import OutlineView from './views/OutlineView.jsx';
-import InteractiveView from './views/InteractiveView.jsx';
+import InteractiveViewDocx from './views/InteractiveViewDocx.jsx';
+import InteractiveViewPpt from './views/InteractiveViewPpt.jsx';
+import InteractiveRouter from './views/InteractiveRouter.jsx';
 // Auth / Shared Components
 import LoginView from './components/Auth/LoginView.jsx';
 import RegisterView from './components/Auth/RegisterView.jsx';
@@ -184,7 +186,7 @@ const App = () => {
                 break;
             case 'interactive':
                 CurrentContent = (
-                    <InteractiveView
+                    <InteractiveRouter
                         setView={setView}
                         userId={user.uid}
                         displayName={userDisplayName}
@@ -195,9 +197,8 @@ const App = () => {
                         setDraftProject={setDraftProject}
                     />
                 );
-                containerClass = "w-full max-w-7xl"; // editor needs more room
+                containerClass = "w-full max-w-7xl";
                 break;
-
         }
     } else {
         // Unauthenticated routes
